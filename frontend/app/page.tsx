@@ -45,6 +45,9 @@ interface Stats {
   google_form_leads: number;    // Leads from Google Forms webhook
   manual_intake_leads: number;  // Leads from staff manual intake
   total_customers: number;      // Unique customer profiles
+  total_technicians: number;    // Total field technicians registered
+  active_assignments: number;   // Tasks currently assigned or in-progress
+  kits_ready: number;           // Kits confirmed ready to dispatch
 }
 
 // ─────────────────────────────────────────────────
@@ -58,6 +61,9 @@ export default function DashboardPage() {
     google_form_leads: 0,
     manual_intake_leads: 0,
     total_customers: 0,
+    total_technicians: 0,
+    active_assignments: 0,
+    kits_ready: 0,
   });
 
   // State: recent leads list fetched from /api/v1/leads/ (limited to 5 most recent)
@@ -126,8 +132,8 @@ export default function DashboardPage() {
       )}
 
       {/* ── Stat Cards Grid ── */}
-      {/* 2 columns on mobile, 4 columns on large screens */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* Row 1: Lead intake stats — 2 columns on mobile, 4 on large screens */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         {/* Card 1: Total Leads */}
         <StatCard
           title="Total Leads"
@@ -166,6 +172,37 @@ export default function DashboardPage() {
         />
       </div>
 
+      {/* Row 2: Field operations stats — 3 cards on large screens */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        {/* Card 5: Field Technicians (amber accent) */}
+        <StatCard
+          title="Field Technicians"
+          value={stats.total_technicians}
+          subtitle="Registered crew members"
+          icon="👷"
+          color="text-amber-600"
+          borderColor="border-amber-400"
+        />
+        {/* Card 6: Active Assignments (rose accent) */}
+        <StatCard
+          title="Active Assignments"
+          value={stats.active_assignments}
+          subtitle="Assigned or in-progress tasks"
+          icon="⚙️"
+          color="text-rose-600"
+          borderColor="border-rose-400"
+        />
+        {/* Card 7: Kits Ready (teal accent) */}
+        <StatCard
+          title="Kits Ready"
+          value={stats.kits_ready}
+          subtitle="Equipment kits confirmed ready"
+          icon="🧰"
+          color="text-teal-600"
+          borderColor="border-teal-400"
+        />
+      </div>
+
       {/* ── Quick Action Buttons ── */}
       <div className="flex flex-wrap gap-3 mb-8">
         {/* Primary CTA: Log a new lead via manual intake */}
@@ -188,6 +225,13 @@ export default function DashboardPage() {
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-slate-700 text-sm font-semibold rounded-xl border border-slate-200 shadow-sm hover:bg-slate-50 transition"
         >
           👥 Customer Profiles
+        </Link>
+        {/* Quaternary CTA: Field technician & kit management */}
+        <Link
+          href="/technicians"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-slate-700 text-sm font-semibold rounded-xl border border-slate-200 shadow-sm hover:bg-slate-50 transition"
+        >
+          👷 Technicians & Kits
         </Link>
       </div>
 
@@ -284,9 +328,9 @@ export default function DashboardPage() {
           <p className="text-xs text-slate-400 mt-0.5">
             Point your Google Apps Script trigger to this URL to auto-capture form leads:
           </p>
-          {/* Monospace URL display */}
+          {/* Monospace URL display — reads from env var so it works in production too */}
           <code className="mt-1 inline-block text-amber-400 text-xs font-mono bg-slate-900 px-3 py-1.5 rounded-lg">
-            POST http://localhost:8000/api/v1/webhooks/google-form/
+            POST {API}/webhooks/google-form/
           </code>
         </div>
         {/* Status pill */}

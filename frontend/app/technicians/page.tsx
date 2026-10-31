@@ -129,16 +129,24 @@ export default function TechniciansPage() {
     status: "available",
   });
 
-  // State: new assignment form inputs
-  const [assignForm, setAssignForm] = useState({
+  // ── Default Assignment Form Values (extracted for easy reset) ────────
+  // Defined as a function so `scheduled_date` computes "today" at time of reset,
+  // not once at component mount time (which would become stale if page stays open past midnight)
+  const makeDefaultAssignForm = () => ({
     technician_id: "",
     lead_id: "",
     task_type: "site_survey",
-    scheduled_date: new Date().toISOString().split("T")[0], // Default to today
+    scheduled_date: new Date().toISOString().split("T")[0], // Always today's date
     kit_status: "kit_ready",
     kit_items: DEFAULT_KIT_TEMPLATES["site_survey"],
     notes: "",
   });
+
+  // Convenience alias used for initial state and resets
+  const DEFAULT_ASSIGN_FORM = makeDefaultAssignForm();
+
+  // State: new assignment form inputs
+  const [assignForm, setAssignForm] = useState(DEFAULT_ASSIGN_FORM);
 
   // State: form submission loading spinner
   const [submitting, setSubmitting] = useState(false);
@@ -367,6 +375,7 @@ export default function TechniciansPage() {
           message: `Task successfully assigned to ${data.data.technician.name}!`,
         });
         setShowAssignModal(false);
+        setAssignForm(makeDefaultAssignForm()); // Reset form fields for next use
         fetchData();
       } else {
         setNotification({
@@ -796,7 +805,7 @@ export default function TechniciansPage() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <h2 className="text-lg font-bold text-slate-900">Assign Technician with Kit</h2>
               <button
-                onClick={() => setShowAssignModal(false)}
+                onClick={() => { setShowAssignModal(false); setAssignForm(makeDefaultAssignForm()); }}
                 className="text-slate-400 hover:text-slate-700 text-sm font-bold"
               >
                 ✕
@@ -917,7 +926,7 @@ export default function TechniciansPage() {
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setShowAssignModal(false)}
+                  onClick={() => { setShowAssignModal(false); setAssignForm(makeDefaultAssignForm()); }}
                   className="px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition"
                 >
                   Cancel
