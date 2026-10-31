@@ -1,6 +1,6 @@
-"use client"; // Client component: manages interactive state, kit updates, and API calls
+"use client"; // Client component: manages interactive state, kit updates, technician registration, and API calls
 
-// React hooks for component state and side effects
+// React hooks for component state, effects, and memoization
 import { useState, useEffect } from "react";
 
 // ─────────────────────────────────────────────────
@@ -59,6 +59,22 @@ interface TechnicianAssignment {
 }
 
 // ─────────────────────────────────────────────────
+// Default equipment kit templates based on task type
+// ─────────────────────────────────────────────────
+const DEFAULT_KIT_TEMPLATES: Record<string, string> = {
+  site_survey:
+    "Digital Inclinometer, Laser Distance Meter, Drone for Shading Analysis, Safety Helmet, Measuring Tape (30m)",
+  structure_mounting:
+    "Aluminium Module Mounting Rails, Mid & End Clamps, L-Feet Anchors, Solar Panels, Torque Wrench Kit, Safety Harnesses (2x)",
+  panel_wiring:
+    "4mm² UV-Resistant DC Solar Cable (100m), MC4 Connectors (10 Pairs), MC4 Crimper & Spanners, DC Fuse Box, Cable Ties",
+  inverter_installation:
+    "3.3kW/5kW Grid-Tie Inverter, AC/DC Distribution Box, SPD (Surge Protection Device), MCB 32A, Hammer Drill, Wall Plugs",
+  grid_commissioning:
+    "Bi-Directional Net Meter, Insulation Resistance Tester (Megger), Digital Multimeter, Earth Pit Tester, Anti-Islanding Rig",
+};
+
+// ─────────────────────────────────────────────────
 // Kit Status styling configuration
 // ─────────────────────────────────────────────────
 const KIT_STYLES: Record<string, { label: string; badge: string; icon: string }> = {
@@ -101,6 +117,18 @@ export default function TechniciansPage() {
   // State: toggle modal to create new task assignment
   const [showAssignModal, setShowAssignModal] = useState(false);
 
+  // State: toggle modal to register new technician
+  const [showTechModal, setShowTechModal] = useState(false);
+
+  // State: new technician form inputs
+  const [techForm, setTechForm] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    specialization: "solar_electrician",
+    status: "available",
+  });
+
   // State: new assignment form inputs
   const [assignForm, setAssignForm] = useState({
     technician_id: "",
@@ -108,7 +136,7 @@ export default function TechniciansPage() {
     task_type: "site_survey",
     scheduled_date: new Date().toISOString().split("T")[0], // Default to today
     kit_status: "kit_ready",
-    kit_items: "Digital Inclinometer, Laser Distance Meter, Drone for Shading, Safety Helmet, 30m Tape",
+    kit_items: DEFAULT_KIT_TEMPLATES["site_survey"],
     notes: "",
   });
 
@@ -153,8 +181,21 @@ export default function TechniciansPage() {
     fetchData();
   }, []);
 
+  // ── When task type changes in modal, auto-update kit template ────
+  const handleTaskTypeChange = (taskType: string) => {
+    const template = DEFAULT_KIT_TEMPLATES[taskType] || "";
+    setAssignForm((prev) => ({
+      ...prev,
+      task_type: taskType,
+      kit_items: template,
+    }));
+  };
+
   // ── Update Kit Status in Database ────────────────────────
-  const handleUpdateKitStatus = async (assignmentId: number, newKitStatus: "kit_ready" | "pending" | "dispatched") => {
+  const handleUpdateKitStatus = async (
+    assignmentId: number,
+    newKitStatus: "kit_ready" | "pending" | "dispatched"
+  ) => {
     try {
       const res = await fetch(`${API}/technician-assignments/${assignmentId}/`, {
         method: "PATCH",
@@ -167,12 +208,131 @@ export default function TechniciansPage() {
           type: "success",
           message: `Kit status updated to "${KIT_STYLES[newKitStatus]?.label || newKitStatus}".`,
         });
-        fetchData(); // Refresh assignments list
+        fetchData();
       } else {
         setNotification({ type: "error", message: "Failed to update kit status." });
       }
     } catch {
       setNotification({ type: "error", message: "Network error updating kit status." });
+    }
+  };
+
+  // ── Update Task Progress Status (Assigned / In Progress / Completed) ────
+  const handleUpdateTaskStatus = async (
+    assignmentId: number,
+    newStatus: "assigned" | "in_progress" | "completed" | "cancelled"
+  ) => {
+    try {
+      const res = await fetch(`${API}/technician-assignments/${assignmentId}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (res.ok) {
+        setNotification({
+          type: "success",
+          message: `Task progress updated to "${newStatus.replace("_", " ")}".`,
+        });
+        fetchData();
+      } else {
+        setNotification({ type: "error", message: "Failed to update task progress." });
+      }
+    } catch {
+      setNotification({ type: "error", message: "Network error updating task progress." });
+    }
+  };
+
+  // ── Update Technician Availability Directly ───────────────
+  const handleUpdateTechStatus = async (
+    techId: number,
+    newStatus: "available" | "on_site" | "off_duty"
+  ) => {
+    try {
+      const res = await fetch(`${API}/technicians/${techId}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (res.ok) {
+        setNotification({
+          type: "success",
+          message: `Technician status updated to "${STATUS_STYLES[newStatus]?.label || newStatus}".`,
+        });
+        fetchData();
+      } else {
+        setNotification({ type: "error", message: "Failed to update technician availability." });
+      }
+    } catch {
+      setNotification({ type: "error", message: "Network error updating technician." });
+    }
+  };
+
+  // ── Delete / Unassign Task ───────────────────────────────
+  const handleDeleteAssignment = async (assignmentId: number) => {
+    if (!window.confirm("Are you sure you want to unassign this task?")) return;
+
+    try {
+      const res = await fetch(`${API}/technician-assignments/${assignmentId}/`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setNotification({
+          type: "success",
+          message: "Task unassigned successfully.",
+        });
+        fetchData();
+      } else {
+        setNotification({ type: "error", message: "Failed to unassign task." });
+      }
+    } catch {
+      setNotification({ type: "error", message: "Network error removing assignment." });
+    }
+  };
+
+  // ── Register New Technician ──────────────────────────────
+  const handleRegisterTechnician = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!techForm.name || !techForm.phone) {
+      setNotification({ type: "error", message: "Technician name and phone are required." });
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const res = await fetch(`${API}/technicians/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(techForm),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setNotification({
+          type: "success",
+          message: `Technician "${data.data.name}" registered successfully!`,
+        });
+        setTechForm({
+          name: "",
+          phone: "",
+          email: "",
+          specialization: "solar_electrician",
+          status: "available",
+        });
+        setShowTechModal(false);
+        fetchData();
+      } else {
+        setNotification({
+          type: "error",
+          message: data.errors ? JSON.stringify(data.errors) : "Failed to register technician.",
+        });
+      }
+    } catch {
+      setNotification({ type: "error", message: "Network error registering technician." });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -240,13 +400,21 @@ export default function TechniciansPage() {
           </p>
         </div>
 
-        {/* Action Button: Assign Task */}
-        <button
-          onClick={() => setShowAssignModal(true)}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-white text-sm font-bold rounded-xl shadow hover:bg-amber-600 transition"
-        >
-          ➕ Assign Task with Kit
-        </button>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowTechModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 text-sm font-semibold rounded-xl border border-slate-300 shadow-sm hover:bg-slate-50 transition"
+          >
+            👤 Add Technician
+          </button>
+          <button
+            onClick={() => setShowAssignModal(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-white text-sm font-bold rounded-xl shadow hover:bg-amber-600 transition"
+          >
+            ➕ Assign Task with Kit
+          </button>
+        </div>
       </div>
 
       {/* ── Notification Banner ── */}
@@ -400,13 +568,19 @@ export default function TechniciansPage() {
                             {kitConfig.icon} {kitConfig.label}
                           </span>
                           {/* Task progress badge */}
-                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700 capitalize">
+                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                            assignment.status === "completed"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : assignment.status === "in_progress"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-slate-100 text-slate-700"
+                          } capitalize`}>
                             {assignment.status.replace("_", " ")}
                           </span>
                         </div>
 
                         {/* Assigned technician */}
-                        <div className="flex items-center gap-4 text-xs text-slate-600">
+                        <div className="flex items-center gap-4 text-xs text-slate-600 flex-wrap">
                           <div>
                             <span className="text-slate-400">Assigned Tech: </span>
                             <span className="font-semibold text-slate-800">{assignment.technician.name}</span>{" "}
@@ -446,40 +620,76 @@ export default function TechniciansPage() {
                         </div>
                       </div>
 
-                      {/* Right: Quick Kit Status Switcher */}
-                      <div className="shrink-0 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2">
-                        <p className="font-bold text-slate-700">Update Kit Status:</p>
-                        <div className="flex flex-col gap-1.5">
-                          <button
-                            onClick={() => handleUpdateKitStatus(assignment.id, "kit_ready")}
-                            className={`px-3 py-1.5 rounded-lg font-semibold text-left transition ${
-                              assignment.kit_status === "kit_ready"
-                                ? "bg-emerald-600 text-white"
-                                : "bg-white text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
-                            }`}
-                          >
-                            ✅ Mark Kit Ready
-                          </button>
-                          <button
-                            onClick={() => handleUpdateKitStatus(assignment.id, "dispatched")}
-                            className={`px-3 py-1.5 rounded-lg font-semibold text-left transition ${
-                              assignment.kit_status === "dispatched"
-                                ? "bg-blue-600 text-white"
-                                : "bg-white text-blue-700 hover:bg-blue-100 border border-blue-200"
-                            }`}
-                          >
-                            🚚 Mark Dispatched
-                          </button>
-                          <button
-                            onClick={() => handleUpdateKitStatus(assignment.id, "pending")}
-                            className={`px-3 py-1.5 rounded-lg font-semibold text-left transition ${
-                              assignment.kit_status === "pending"
-                                ? "bg-amber-600 text-white"
-                                : "bg-white text-amber-700 hover:bg-amber-100 border border-amber-200"
-                            }`}
-                          >
-                            ⏳ Mark Pending
-                          </button>
+                      {/* Right: Quick Action Panels (Kit Status & Task Progress) */}
+                      <div className="shrink-0 flex flex-col sm:flex-row lg:flex-col gap-3">
+                        {/* Kit Status Switcher */}
+                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2">
+                          <p className="font-bold text-slate-700">Update Kit Status:</p>
+                          <div className="flex flex-col gap-1.5">
+                            <button
+                              onClick={() => handleUpdateKitStatus(assignment.id, "kit_ready")}
+                              className={`px-3 py-1.5 rounded-lg font-semibold text-left transition ${
+                                assignment.kit_status === "kit_ready"
+                                  ? "bg-emerald-600 text-white"
+                                  : "bg-white text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                              }`}
+                            >
+                              ✅ Mark Kit Ready
+                            </button>
+                            <button
+                              onClick={() => handleUpdateKitStatus(assignment.id, "dispatched")}
+                              className={`px-3 py-1.5 rounded-lg font-semibold text-left transition ${
+                                assignment.kit_status === "dispatched"
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-white text-blue-700 hover:bg-blue-100 border border-blue-200"
+                              }`}
+                            >
+                              🚚 Mark Dispatched
+                            </button>
+                            <button
+                              onClick={() => handleUpdateKitStatus(assignment.id, "pending")}
+                              className={`px-3 py-1.5 rounded-lg font-semibold text-left transition ${
+                                assignment.kit_status === "pending"
+                                  ? "bg-amber-600 text-white"
+                                  : "bg-white text-amber-700 hover:bg-amber-100 border border-amber-200"
+                              }`}
+                            >
+                              ⏳ Mark Pending
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Task Execution Progress Switcher */}
+                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2">
+                          <p className="font-bold text-slate-700">Task Progress:</p>
+                          <div className="flex flex-col gap-1.5">
+                            <button
+                              onClick={() => handleUpdateTaskStatus(assignment.id, "in_progress")}
+                              className={`px-3 py-1.5 rounded-lg font-semibold text-left transition ${
+                                assignment.status === "in_progress"
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-white text-blue-700 hover:bg-blue-100 border border-blue-200"
+                              }`}
+                            >
+                              ⚙️ In Progress
+                            </button>
+                            <button
+                              onClick={() => handleUpdateTaskStatus(assignment.id, "completed")}
+                              className={`px-3 py-1.5 rounded-lg font-semibold text-left transition ${
+                                assignment.status === "completed"
+                                  ? "bg-emerald-600 text-white"
+                                  : "bg-white text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                              }`}
+                            >
+                              🎉 Completed
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAssignment(assignment.id)}
+                              className="px-3 py-1.5 rounded-lg font-semibold text-left text-rose-600 hover:bg-rose-50 border border-rose-200 transition"
+                            >
+                              🗑️ Unassign Task
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -504,35 +714,74 @@ export default function TechniciansPage() {
             return (
               <div
                 key={tech.id}
-                className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition"
+                className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition flex flex-col justify-between"
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 font-bold text-base flex items-center justify-center">
-                      👷
+                <div>
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 font-bold text-base flex items-center justify-center">
+                        👷
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900">{tech.name}</h3>
+                        <p className="text-xs text-slate-500">{tech.specialization_display}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900">{tech.name}</h3>
-                      <p className="text-xs text-slate-500">{tech.specialization_display}</p>
-                    </div>
+                    {/* Availability badge */}
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusStyle.text}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
+                      {statusStyle.label}
+                    </span>
                   </div>
-                  {/* Availability badge */}
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusStyle.text}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
-                    {statusStyle.label}
-                  </span>
+
+                  <div className="space-y-1 text-xs text-slate-600 mb-4">
+                    <p>📞 {tech.phone}</p>
+                    {tech.email && <p>✉️ {tech.email}</p>}
+                  </div>
                 </div>
 
-                <div className="space-y-1 text-xs text-slate-600 mb-4">
-                  <p>📞 {tech.phone}</p>
-                  {tech.email && <p>✉️ {tech.email}</p>}
-                </div>
+                <div className="border-t border-slate-100 pt-3 space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Active Tasks:</span>
+                    <span className="font-bold text-slate-900 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                      {tech.active_tasks_count}
+                    </span>
+                  </div>
 
-                <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-xs">
-                  <span className="text-slate-500">Active Tasks:</span>
-                  <span className="font-bold text-slate-900 bg-slate-100 px-2.5 py-0.5 rounded-full">
-                    {tech.active_tasks_count}
-                  </span>
+                  {/* Quick Availability Changer */}
+                  <div className="bg-slate-50 p-2 rounded-xl text-xs flex items-center justify-between gap-1">
+                    <span className="text-slate-400 font-semibold text-[10px]">SET:</span>
+                    <button
+                      onClick={() => handleUpdateTechStatus(tech.id, "available")}
+                      className={`px-2 py-1 rounded text-[11px] font-semibold transition ${
+                        tech.status === "available"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      Available
+                    </button>
+                    <button
+                      onClick={() => handleUpdateTechStatus(tech.id, "on_site")}
+                      className={`px-2 py-1 rounded text-[11px] font-semibold transition ${
+                        tech.status === "on_site"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      On Site
+                    </button>
+                    <button
+                      onClick={() => handleUpdateTechStatus(tech.id, "off_duty")}
+                      className={`px-2 py-1 rounded text-[11px] font-semibold transition ${
+                        tech.status === "off_duty"
+                          ? "bg-slate-600 text-white shadow-xs"
+                          : "text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      Off Duty
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -540,7 +789,7 @@ export default function TechniciansPage() {
         </div>
       )}
 
-      {/* ── MODAL: ASSIGN TASK WITH KIT READINESS ── */}
+      {/* ── MODAL 1: ASSIGN TASK WITH KIT READINESS ── */}
       {showAssignModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -595,12 +844,12 @@ export default function TechniciansPage() {
                 </select>
               </div>
 
-              {/* Task Type */}
+              {/* Task Type (with dynamic kit template selection) */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Task Type</label>
                 <select
                   value={assignForm.task_type}
-                  onChange={(e) => setAssignForm({ ...assignForm, task_type: e.target.value })}
+                  onChange={(e) => handleTaskTypeChange(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
                 >
                   <option value="site_survey">Site Survey &amp; Shading Analysis</option>
@@ -609,6 +858,9 @@ export default function TechniciansPage() {
                   <option value="inverter_installation">Inverter &amp; DB Installation</option>
                   <option value="grid_commissioning">Grid Synchronizing &amp; Net Meter Commissioning</option>
                 </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  💡 Selecting a task type automatically updates the equipment checklist below.
+                </p>
               </div>
 
               {/* Scheduled Date */}
@@ -682,7 +934,114 @@ export default function TechniciansPage() {
           </div>
         </div>
       )}
+
+      {/* ── MODAL 2: REGISTER NEW TECHNICIAN ── */}
+      {showTechModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <h2 className="text-lg font-bold text-slate-900">Register Field Technician</h2>
+              <button
+                onClick={() => setShowTechModal(false)}
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleRegisterTechnician} className="space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Full Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Arjun Reddy"
+                  value={techForm.name}
+                  onChange={(e) => setTechForm({ ...techForm, name: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Phone Number <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. +919876500010"
+                  value={techForm.phone}
+                  onChange={(e) => setTechForm({ ...techForm, phone: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Email Address (Optional)</label>
+                <input
+                  type="email"
+                  placeholder="e.g. arjun@mihirasolar.com"
+                  value={techForm.email}
+                  onChange={(e) => setTechForm({ ...techForm, email: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Specialization */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Specialization</label>
+                <select
+                  value={techForm.specialization}
+                  onChange={(e) => setTechForm({ ...techForm, specialization: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                >
+                  <option value="solar_electrician">Solar Electrician</option>
+                  <option value="site_surveyor">Site Surveyor</option>
+                  <option value="mounting_specialist">Mounting Specialist</option>
+                  <option value="commissioning_engineer">Commissioning Engineer</option>
+                </select>
+              </div>
+
+              {/* Initial Status */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Initial Availability</label>
+                <select
+                  value={techForm.status}
+                  onChange={(e) => setTechForm({ ...techForm, status: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                >
+                  <option value="available">Available</option>
+                  <option value="on_site">On Site</option>
+                  <option value="off_duty">Off Duty</option>
+                </select>
+              </div>
+
+              {/* Form buttons */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowTechModal(false)}
+                  className="px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 text-sm font-bold text-white bg-amber-500 rounded-xl shadow hover:bg-amber-600 transition disabled:opacity-50"
+                >
+                  {submitting ? "Saving…" : "Save Technician"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

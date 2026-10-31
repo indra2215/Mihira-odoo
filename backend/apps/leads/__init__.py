@@ -26,6 +26,7 @@ __all__ = [
     "GoogleFormWebhookView",
     "DashboardStatsView",
     "TechnicianListCreateView",
+    "TechnicianDetailView",
     "TechnicianAssignmentListCreateView",
     "TechnicianAssignmentDetailView",
     # Application Configuration
@@ -61,6 +62,7 @@ def __getattr__(name: str):
         "GoogleFormWebhookView",
         "DashboardStatsView",
         "TechnicianListCreateView",
+        "TechnicianDetailView",
         "TechnicianAssignmentListCreateView",
         "TechnicianAssignmentDetailView",
     ):

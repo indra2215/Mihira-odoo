@@ -12,6 +12,7 @@ from .views import (
     GoogleFormWebhookView,
     DashboardStatsView,
     TechnicianListCreateView,
+    TechnicianDetailView,
     TechnicianAssignmentListCreateView,
     TechnicianAssignmentDetailView,
 )
@@ -33,6 +34,10 @@ urlpatterns = [
     # Route for listing and registering field technicians
     # URL: /api/v1/technicians/
     path("technicians/", TechnicianListCreateView.as_view(), name="technician-list-create"),
+
+    # Route for viewing, updating availability, and deleting a technician
+    # URL: /api/v1/technicians/<id>/
+    path("technicians/<int:pk>/", TechnicianDetailView.as_view(), name="technician-detail"),
 
     # Route for listing and creating technician task assignments with kit readiness
     # URL: /api/v1/technician-assignments/

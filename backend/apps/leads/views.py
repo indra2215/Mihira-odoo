@@ -252,6 +252,65 @@ class TechnicianListCreateView(APIView):
         )
 
 
+class TechnicianDetailView(APIView):
+    """
+    Endpoint for:
+      - GET    /api/v1/technicians/<id>/ -> Retrieve single technician details
+      - PATCH  /api/v1/technicians/<id>/ -> Update status (available/on_site/off_duty) or contact info
+      - DELETE /api/v1/technicians/<id>/ -> Remove technician profile from system
+    """
+
+    def get(self, request, pk):
+        """Fetches individual technician by primary key."""
+        try:
+            tech = Technician.objects.get(pk=pk)
+        except Technician.DoesNotExist:
+            return Response(
+                {"status": "error", "message": "Technician not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response({"status": "success", "data": TechnicianSerializer(tech).data})
+
+    def patch(self, request, pk):
+        """Updates technician status or details."""
+        try:
+            tech = Technician.objects.get(pk=pk)
+        except Technician.DoesNotExist:
+            return Response(
+                {"status": "error", "message": "Technician not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = TechnicianSerializer(tech, data=request.data, partial=True)
+        if serializer.is_valid():
+            updated = serializer.save()
+            return Response({
+                "status": "success",
+                "message": f"Technician {updated.name} updated.",
+                "data": TechnicianSerializer(updated).data,
+            })
+        return Response(
+            {"status": "error", "errors": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def delete(self, request, pk):
+        """Deletes technician record."""
+        try:
+            tech = Technician.objects.get(pk=pk)
+        except Technician.DoesNotExist:
+            return Response(
+                {"status": "error", "message": "Technician not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        name = tech.name
+        tech.delete()
+        return Response({
+            "status": "success",
+            "message": f"Technician {name} deleted.",
+        })
+
+
 class TechnicianAssignmentListCreateView(APIView):
     """
     Endpoint for:
@@ -338,3 +397,19 @@ class TechnicianAssignmentDetailView(APIView):
             {"status": "error", "errors": serializer.errors},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    def delete(self, request, pk):
+        """Cancels and deletes an assignment."""
+        try:
+            assignment = TechnicianAssignment.objects.get(pk=pk)
+        except TechnicianAssignment.DoesNotExist:
+            return Response(
+                {"status": "error", "message": "Assignment not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        task_id = assignment.id
+        assignment.delete()
+        return Response({
+            "status": "success",
+            "message": f"Task #{task_id} unassigned successfully.",
+        })
