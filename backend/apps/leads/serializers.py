@@ -132,6 +132,61 @@ class GoogleFormWebhookSerializer(serializers.Serializer):
     # Optional feedback or comments
     notes = serializers.CharField(required=False, allow_blank=True, default="")
 
+    def to_internal_value(self, data):
+        """
+        Normalizes diverse Google Form question labels into standard model fields.
+        Also cleans phone formatting and appends unmatched questions into notes.
+        """
+        normalized = {}
+        unmatched_notes = []
+
+        # Mapping of common Google Form question titles to target schema fields
+        field_mappings = {
+            "name": ["name", "full name", "customer name", "your name", "full_name"],
+            "phone": ["phone", "mobile", "phone number", "mobile number", "contact", "whatsapp"],
+            "email": ["email", "email address", "email_address"],
+            "address": ["address", "site address", "installation address", "location", "city"],
+            "monthly_bill": ["monthly bill", "average bill", "electricity bill", "monthly_bill", "bill"],
+            "monthly_units": ["monthly units", "units", "monthly_units", "kwh", "consumption"],
+            "sanctioned_load_kw": ["sanctioned load", "load", "sanctioned_load_kw", "meter load"],
+            "roof_area_sqm": ["roof area", "roof size", "roof_area_sqm", "rooftop area", "shadow free"],
+            "notes": ["notes", "remarks", "comments", "feedback", "requirements"],
+        }
+
+        # Normalize incoming dictionary keys to lower-case for case-insensitive matching
+        for key, val in data.items():
+            if val is None or val == "":
+                continue
+
+            # If value is a list (from Google Forms responses.namedValues), take the first item
+            if isinstance(val, list):
+                val = val[0] if len(val) > 0 else ""
+
+            k_clean = str(key).strip().lower()
+            matched = False
+
+            for target_field, aliases in field_mappings.items():
+                if any(alias in k_clean for alias in aliases):
+                    if target_field not in normalized:
+                        # Clean phone numbers of spaces, dashes, and parens
+                        if target_field == "phone" and isinstance(val, str):
+                            val = "".join(ch for ch in val if ch.isdigit() or ch == "+")
+                        normalized[target_field] = val
+                    matched = True
+                    break
+
+            # If this question didn't match standard fields, append to notes so it's not lost
+            if not matched and val:
+                unmatched_notes.append(f"{key}: {val}")
+
+        # Append any unmatched custom questions to notes
+        if unmatched_notes:
+            existing = normalized.get("notes", "")
+            extra_text = " | ".join(unmatched_notes)
+            normalized["notes"] = f"{existing} [{extra_text}]".strip() if existing else extra_text
+
+        return super().to_internal_value(normalized)
+
     def save_lead(self, raw_payload=None):
         """
         Saves the webhook submission:

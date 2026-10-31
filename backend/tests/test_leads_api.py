@@ -160,3 +160,28 @@ class LeadsAPITestCase(TestCase):
         self.assertEqual(patch_res.status_code, 200)
         self.assertEqual(patch_res.data["data"]["kit_status"], "dispatched")
         self.assertEqual(patch_res.data["data"]["status"], "in_progress")
+
+
+    def test_flexible_google_form_question_labels(self):
+        """Verify Google Form submissions with custom question titles are normalized correctly."""
+        # Simulated payload matching exact Google Forms event.namedValues format
+        google_form_payload = {
+            "Full Name": ["Venkatesh Iyer"],
+            "WhatsApp Number": ["+91 99887-12345"],
+            "Installation Address": ["Villa 8, Whitefield, Bangalore"],
+            "Average Monthly Bill (₹)": ["7500.50"],
+            "Average Monthly Units (kWh)": ["800"],
+            "What type of roof do you have?": ["Flat Concrete Terrace, 1200 sqft"],
+        }
+
+        res = self.client.post("/api/v1/webhooks/google-form/", google_form_payload, format="json")
+        self.assertEqual(res.status_code, 201)
+
+        # Verify customer created with cleaned phone number
+        customer = Customer.objects.get(phone="+919988712345")
+        self.assertEqual(customer.name, "Venkatesh Iyer")
+
+        # Verify lead created with bill and unmatched custom questions in notes
+        lead = Lead.objects.get(customer=customer)
+        self.assertEqual(float(lead.monthly_bill), 7500.50)
+        self.assertIn("What type of roof do you have?", lead.notes)
