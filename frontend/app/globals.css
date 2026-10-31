@@ -1,0 +1,36 @@
+/* ============================================================================
+   GLOBAL STYLESHEET - Mihira Solar ERP Frontend
+   Imports Tailwind CSS layers and sets base typography and color variables.
+   ============================================================================ */
+
+/* Import Tailwind's base reset styles (normalize.css-level browser consistency) */
+@tailwind base;
+
+/* Import Tailwind's reusable component classes (buttons, cards, etc.) */
+@tailwind components;
+
+/* Import Tailwind's utility classes (margin, padding, colors, flex, grid, etc.) */
+@tailwind utilities;
+
+/* CSS custom properties (variables) for the application color palette */
+:root {
+  /* Slate-900 in RGB for rich dark readable text */
+  --foreground-rgb: 15, 23, 42;
+
+  /* Slate-50 in RGB for a clean off-white background */
+  --background-rgb: 248, 250, 252;
+}
+
+/* Apply global text color and background from CSS variables defined above */
+body {
+  /* Text color: slate-900 (near-black) for strong contrast and readability */
+  color: rgb(var(--foreground-rgb));
+
+  /* Background: slate-50 (very light gray) giving a professional neutral feel */
+  background: rgb(var(--background-rgb));
+
+  /* Font stack: system fonts for fast load and native OS rendering */
+  /* Falls back progressively: system-ui → Apple system font → Windows Segoe UI → Linux fonts */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+

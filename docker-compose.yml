@@ -1,0 +1,101 @@
+# ==============================================================================
+# Docker Compose Orchestration for Mihira Solar ERP
+# Defines multi-container setup: PostgreSQL 16, Django Backend, and React Frontend
+# ==============================================================================
+version: "3.9"
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. PostgreSQL 16 Relational Database Service
+  # ----------------------------------------------------------------------------
+  db:
+    # Use official lightweight PostgreSQL 16 Alpine image
+    image: postgres:16-alpine
+
+    # Automatically restart container unless explicitly stopped
+    restart: unless-stopped
+
+    # Environment variables configuring the database credentials
+    environment:
+      POSTGRES_DB: ${DB_NAME:-mihira}         # Database name (default: mihira)
+      POSTGRES_USER: ${DB_USER:-mihira}       # Database user (default: mihira)
+      POSTGRES_PASSWORD: ${DB_PASS:-mihira}   # Database password (default: mihira)
+
+    # Expose PostgreSQL default port to host machine
+    ports:
+      - "5432:5432"
+
+    # Persistent volume for database data and automatic SQL init script mounting
+    volumes:
+      - pgdata:/var/lib/postgresql/data       # Named volume persisting database files
+      - ./database:/docker-entrypoint-initdb.d:ro # Mounts schema.sql and seed.sql for auto-init
+
+  # ----------------------------------------------------------------------------
+  # 2. Django 5 + DRF Python Backend Service
+  # ----------------------------------------------------------------------------
+  backend:
+    # Build container from backend/Dockerfile
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+
+    # Automatically restart container unless explicitly stopped
+    restart: unless-stopped
+
+    # Start Django development server listening on port 8000
+    command: python manage.py runserver 0.0.0.0:8000
+
+    # Environment variables passed to Django
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-dev-secret-change-me} # Secret key
+      - DEBUG=1                                                      # Debug mode enabled
+      - DB_NAME=${DB_NAME:-mihira}                                   # PostgreSQL database name
+      - DB_USER=${DB_USER:-mihira}                                   # PostgreSQL user
+      - DB_PASS=${DB_PASS:-mihira}                                   # PostgreSQL password
+      - DB_HOST=db                                                   # Hostname matching db service
+      - DB_PORT=5432                                                 # PostgreSQL port
+
+    # Mount local backend code to allow live code reloading without rebuilding image
+    volumes:
+      - ./backend:/app
+
+    # Expose backend API port
+    ports:
+      - "8000:8000"
+
+    # Wait for PostgreSQL container to start before running backend
+    depends_on:
+      - db
+
+  # ----------------------------------------------------------------------------
+  # 3. Next.js 14 React Frontend Service
+  # ----------------------------------------------------------------------------
+  frontend:
+    # Build container from frontend/Dockerfile
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+
+    # Automatically restart container unless explicitly stopped
+    restart: unless-stopped
+
+    # Expose React UI port
+    ports:
+      - "3000:3000"
+
+    # Environment variables configuring the API endpoint URL for React
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+
+    # Mount local frontend code for hot-reloading
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Anonymous volume preventing host node_modules collision
+
+    # Ensure backend starts before frontend
+    depends_on:
+      - backend
+
+# Named volume definition for PostgreSQL data persistence across restarts
+volumes:
+  pgdata:
