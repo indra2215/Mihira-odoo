@@ -16,10 +16,15 @@ from rest_framework.response import Response
 from django.db.models import Q
 
 # Import database models
-from .models import Lead, Customer, InboundSubmission
+from .models import Lead, Customer, InboundSubmission, Technician, TechnicianAssignment
 
 # Import request validators and serializers
-from .serializers import LeadSerializer, GoogleFormWebhookSerializer
+from .serializers import (
+    LeadSerializer,
+    GoogleFormWebhookSerializer,
+    TechnicianSerializer,
+    TechnicianAssignmentSerializer,
+)
 
 
 class LeadListCreateView(APIView):
@@ -169,6 +174,17 @@ class DashboardStatsView(APIView):
         # Count total registered customer profiles
         total_customers = Customer.objects.count()
 
+        # Count total active field technicians
+        total_technicians = Technician.objects.count()
+
+        # Count currently active tasks (assigned or in progress)
+        active_assignments = TechnicianAssignment.objects.filter(
+            status__in=["assigned", "in_progress"]
+        ).count()
+
+        # Count tasks where kit is ready to go
+        kits_ready = TechnicianAssignment.objects.filter(kit_status="kit_ready").count()
+
         # Return stats dictionary in JSON format
         return Response(
             {
@@ -178,6 +194,147 @@ class DashboardStatsView(APIView):
                     "google_form_leads": google_form_leads,
                     "manual_intake_leads": manual_leads,
                     "total_customers": total_customers,
+                    "total_technicians": total_technicians,
+                    "active_assignments": active_assignments,
+                    "kits_ready": kits_ready,
                 },
             }
+        )
+
+
+class TechnicianListCreateView(APIView):
+    """
+    Endpoint for:
+      - GET  /api/v1/technicians/ -> List all field technicians with their availability
+      - POST /api/v1/technicians/ -> Register a new field technician
+    """
+
+    def get(self, request):
+        """Retrieves all technicians, supporting status and specialization filters."""
+        # Query all technicians ordered by name
+        technicians = Technician.objects.all()
+
+        # Filter by status if specified (e.g. ?status=available)
+        status_param = request.query_params.get("status", "").strip()
+        if status_param:
+            technicians = technicians.filter(status=status_param)
+
+        # Filter by specialization if specified (e.g. ?specialization=solar_electrician)
+        spec_param = request.query_params.get("specialization", "").strip()
+        if spec_param:
+            technicians = technicians.filter(specialization=spec_param)
+
+        # Serialize queryset to JSON
+        serializer = TechnicianSerializer(technicians, many=True)
+
+        return Response({
+            "status": "success",
+            "count": len(serializer.data),
+            "data": serializer.data,
+        })
+
+    def post(self, request):
+        """Registers a new field technician."""
+        serializer = TechnicianSerializer(data=request.data)
+        if serializer.is_valid():
+            technician = serializer.save()
+            return Response(
+                {
+                    "status": "success",
+                    "message": f"Technician {technician.name} registered.",
+                    "data": TechnicianSerializer(technician).data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(
+            {"status": "error", "errors": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+class TechnicianAssignmentListCreateView(APIView):
+    """
+    Endpoint for:
+      - GET  /api/v1/technician-assignments/ -> List tasks with technician, lead & kit status
+      - POST /api/v1/technician-assignments/ -> Assign a task with kit specifications
+    """
+
+    def get(self, request):
+        """Retrieves assignments pre-fetching technician, lead and customer relations."""
+        # Query assignments joining foreign keys in a single SQL operation
+        assignments = (
+            TechnicianAssignment.objects.select_related("technician", "lead", "lead__customer")
+            .all()
+        )
+
+        # Filter by technician ID if specified (?technician_id=1)
+        tech_id = request.query_params.get("technician_id", "").strip()
+        if tech_id:
+            assignments = assignments.filter(technician_id=tech_id)
+
+        # Filter by kit readiness status if specified (?kit_status=kit_ready)
+        kit_status_param = request.query_params.get("kit_status", "").strip()
+        if kit_status_param:
+            assignments = assignments.filter(kit_status=kit_status_param)
+
+        # Filter by task execution status if specified (?status=assigned)
+        task_status_param = request.query_params.get("status", "").strip()
+        if task_status_param:
+            assignments = assignments.filter(status=task_status_param)
+
+        # Serialize queryset
+        serializer = TechnicianAssignmentSerializer(assignments, many=True)
+
+        return Response({
+            "status": "success",
+            "count": len(serializer.data),
+            "data": serializer.data,
+        })
+
+    def post(self, request):
+        """Creates a new technician task assignment with kit inventory details."""
+        serializer = TechnicianAssignmentSerializer(data=request.data)
+        if serializer.is_valid():
+            assignment = serializer.save()
+            return Response(
+                {
+                    "status": "success",
+                    "message": f"Task #{assignment.id} assigned to {assignment.technician.name}.",
+                    "data": TechnicianAssignmentSerializer(assignment).data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(
+            {"status": "error", "errors": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+class TechnicianAssignmentDetailView(APIView):
+    """
+    Endpoint for:
+      - PATCH /api/v1/technician-assignments/<id>/ -> Update kit status, execution stage or notes
+    """
+
+    def patch(self, request, pk):
+        """Updates kit readiness or task status."""
+        try:
+            assignment = TechnicianAssignment.objects.get(pk=pk)
+        except TechnicianAssignment.DoesNotExist:
+            return Response(
+                {"status": "error", "message": "Assignment not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = TechnicianAssignmentSerializer(assignment, data=request.data, partial=True)
+        if serializer.is_valid():
+            updated = serializer.save()
+            return Response({
+                "status": "success",
+                "message": f"Task #{updated.id} updated successfully.",
+                "data": TechnicianAssignmentSerializer(updated).data,
+            })
+        return Response(
+            {"status": "error", "errors": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST,
         )

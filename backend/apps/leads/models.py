@@ -173,3 +173,158 @@ class InboundSubmission(models.Model):
     def __str__(self):
         # String representation displaying submission ID and timestamp
         return f"Submission #{self.id} from {self.source} at {self.received_at.strftime('%Y-%m-%d %H:%M')}"
+
+
+class Technician(models.Model):
+    """
+    Field crew member or solar engineer working on installations, surveys, or commissioning.
+    """
+    SPECIALIZATION_CHOICES = [
+        ("solar_electrician", "Solar Electrician"),
+        ("site_surveyor", "Site Surveyor"),
+        ("mounting_specialist", "Mounting Specialist"),
+        ("commissioning_engineer", "Commissioning Engineer"),
+    ]
+
+    STATUS_CHOICES = [
+        ("available", "Available"),
+        ("on_site", "On Site"),
+        ("off_duty", "Off Duty"),
+    ]
+
+    # Full name of technician
+    name = models.CharField(max_length=255, help_text="Technician full name")
+
+    # Unique mobile contact number
+    phone = models.CharField(max_length=32, unique=True, help_text="Unique phone number")
+
+    # Optional email address
+    email = models.EmailField(blank=True, default="", help_text="Technician email (optional)")
+
+    # Specialized field skill
+    specialization = models.CharField(
+        max_length=64,
+        choices=SPECIALIZATION_CHOICES,
+        default="solar_electrician",
+        help_text="Primary technical specialization"
+    )
+
+    # Current availability status
+    status = models.CharField(
+        max_length=32,
+        choices=STATUS_CHOICES,
+        default="available",
+        help_text="Current availability status"
+    )
+
+    # Creation timestamp
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # Last update timestamp
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "technicians"
+        ordering = ["name"]
+
+    def __str__(self):
+        # String representation showing name, role, and current availability
+        return f"{self.name} - {self.get_specialization_display()} ({self.status})"
+
+
+class TechnicianAssignment(models.Model):
+    """
+    Task assignment connecting a field technician to a solar project/lead,
+    tracking target date, execution status, and equipment kit readiness.
+    """
+    TASK_CHOICES = [
+        ("site_survey", "Site Survey & Shading Analysis"),
+        ("structure_mounting", "Structure & Panel Mounting"),
+        ("panel_wiring", "DC Panel Wiring"),
+        ("inverter_installation", "Inverter & DB Installation"),
+        ("grid_commissioning", "Grid Synchronizing & Net Meter Commissioning"),
+    ]
+
+    KIT_STATUS_CHOICES = [
+        ("kit_ready", "Kit Ready"),
+        ("pending", "Kit Pending"),
+        ("dispatched", "Kit Dispatched"),
+    ]
+
+    STATUS_CHOICES = [
+        ("assigned", "Assigned"),
+        ("in_progress", "In Progress"),
+        ("completed", "Completed"),
+        ("cancelled", "Cancelled"),
+    ]
+
+    # Assigned technician
+    technician = models.ForeignKey(
+        Technician,
+        on_delete=models.CASCADE,
+        related_name="assignments",
+        help_text="The technician assigned to execute this task"
+    )
+
+    # Associated customer project enquiry
+    lead = models.ForeignKey(
+        Lead,
+        on_delete=models.CASCADE,
+        related_name="assignments",
+        help_text="The solar project lead this task belongs to"
+    )
+
+    # Job type
+    task_type = models.CharField(
+        max_length=64,
+        choices=TASK_CHOICES,
+        default="site_survey",
+        help_text="Type of technical job to perform"
+    )
+
+    # Target scheduled date
+    scheduled_date = models.DateField(help_text="Scheduled date for task execution")
+
+    # Kit readiness status
+    kit_status = models.CharField(
+        max_length=32,
+        choices=KIT_STATUS_CHOICES,
+        default="pending",
+        help_text="Readiness state of the required tools and materials kit"
+    )
+
+    # Equipment, tools, and materials checklist for this task
+    kit_items = models.TextField(
+        blank=True,
+        default="",
+        help_text="Kit inventory: tools, meters, safety gear, and materials required"
+    )
+
+    # Task execution progress
+    status = models.CharField(
+        max_length=32,
+        choices=STATUS_CHOICES,
+        default="assigned",
+        help_text="Task lifecycle progress status"
+    )
+
+    # Field notes or roof access instructions
+    notes = models.TextField(
+        blank=True,
+        default="",
+        help_text="Access instructions, customer constraints, or technical remarks"
+    )
+
+    # Creation timestamp
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # Last update timestamp
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "technician_assignments"
+        ordering = ["scheduled_date", "-created_at"]
+
+    def __str__(self):
+        # String representation showing task ID, technician name, job type, and kit status
+        return f"Task #{self.id}: {self.technician.name} - {self.get_task_type_display()} ({self.kit_status})"

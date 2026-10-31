@@ -7,7 +7,7 @@ Validates input data for staff call intake and incoming Google Forms webhooks.
 from rest_framework import serializers
 
 # Import database models
-from .models import Customer, Lead, InboundSubmission
+from .models import Customer, Lead, InboundSubmission, Technician, TechnicianAssignment
 
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -172,3 +172,88 @@ class GoogleFormWebhookSerializer(serializers.Serializer):
             notes=data.get("notes", "Submitted via Google Form"),
         )
         return lead
+
+
+class TechnicianSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the Technician model.
+    Converts technician records into JSON format for the front-end directory.
+    Includes active assignment count.
+    """
+    # Computed read-only display string for specialization choice
+    specialization_display = serializers.CharField(source="get_specialization_display", read_only=True)
+
+    # Computed count of tasks currently assigned to this technician
+    active_tasks_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Technician
+        fields = [
+            "id",
+            "name",
+            "phone",
+            "email",
+            "specialization",
+            "specialization_display",
+            "status",
+            "active_tasks_count",
+            "created_at",
+        ]
+
+    def get_active_tasks_count(self, obj):
+        """Calculates total pending and in-progress assignments for this technician."""
+        return obj.assignments.exclude(status__in=["completed", "cancelled"]).count()
+
+
+class TechnicianAssignmentSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Technician Assignments & Kit Readiness.
+    Supports both reading detailed nested objects and writing using foreign key IDs.
+    """
+    # Nested read-only technician details for display in the UI
+    technician = TechnicianSerializer(read_only=True)
+
+    # Write-only ID for associating a technician on creation / update
+    technician_id = serializers.PrimaryKeyRelatedField(
+        queryset=Technician.objects.all(),
+        source="technician",
+        write_only=True,
+        required=True
+    )
+
+    # Nested read-only lead details for display in the UI
+    lead = LeadSerializer(read_only=True)
+
+    # Write-only ID for associating the task to a lead
+    lead_id = serializers.PrimaryKeyRelatedField(
+        queryset=Lead.objects.all(),
+        source="lead",
+        write_only=True,
+        required=True
+    )
+
+    # Human-readable label for task type choice
+    task_type_display = serializers.CharField(source="get_task_type_display", read_only=True)
+
+    # Human-readable label for kit status choice
+    kit_status_display = serializers.CharField(source="get_kit_status_display", read_only=True)
+
+    class Meta:
+        model = TechnicianAssignment
+        fields = [
+            "id",
+            "technician",
+            "technician_id",
+            "lead",
+            "lead_id",
+            "task_type",
+            "task_type_display",
+            "scheduled_date",
+            "kit_status",
+            "kit_status_display",
+            "kit_items",
+            "status",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]

@@ -52,8 +52,68 @@ INSERT INTO leads (id, customer_id, source, status, monthly_units, monthly_bill,
 ON CONFLICT (id) DO NOTHING;
 
 -- ------------------------------------------------------------------------------
--- 3. Reset PostgreSQL Auto-Increment Sequences
--- Ensures subsequent INSERT statements without explicit IDs generate IDs starting from 3
+-- 3. Insert Sample Technicians (Field Staff)
+-- ------------------------------------------------------------------------------
+INSERT INTO technicians (id, name, phone, email, specialization, status) VALUES
+(
+    1,
+    'Ramesh Rao',
+    '+919876500001',
+    'ramesh.rao@mihirasolar.com',
+    'site_surveyor',
+    'available'
+),
+(
+    2,
+    'Vikram Singh',
+    '+919876500002',
+    'vikram.singh@mihirasolar.com',
+    'solar_electrician',
+    'on_site'
+),
+(
+    3,
+    'Anita Desai',
+    '+919876500003',
+    'anita.desai@mihirasolar.com',
+    'commissioning_engineer',
+    'available'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- ------------------------------------------------------------------------------
+-- 4. Insert Sample Technician Task Assignments & Kit Readiness
+-- ------------------------------------------------------------------------------
+INSERT INTO technician_assignments (id, technician_id, lead_id, task_type, scheduled_date, kit_status, kit_items, status, notes) VALUES
+(
+    1,
+    1, -- Assigned to Ramesh Rao (Site Surveyor)
+    1, -- For Lead #1 (Rahul Sharma)
+    'site_survey',
+    CURRENT_DATE + INTERVAL '1 day',
+    'kit_ready',
+    'Digital Inclinometer, Laser Distance Meter, Drone for Shading Analysis, Safety Helmet, Measuring Tape (30m)',
+    'assigned',
+    'Customer confirmed morning visit at 10 AM. Check South-facing shadow on RCC parapet.'
+),
+(
+    2,
+    2, -- Assigned to Vikram Singh (Solar Electrician)
+    2, -- For Lead #2 (Priya Patel)
+    'inverter_installation',
+    CURRENT_DATE,
+    'dispatched',
+    '3.3kW On-Grid Inverter, 4mm² Solar DC Cable (50m), MC4 Crimping Kit, AC/DC Distribution Box, Earthing Rods (2x)',
+    'in_progress',
+    'Customer requested inverter to be mounted in covered utility corridor near main DB.'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- ------------------------------------------------------------------------------
+-- 5. Reset PostgreSQL Auto-Increment Sequences
+-- Ensures subsequent INSERT statements without explicit IDs generate IDs starting from MAX+1
 -- ------------------------------------------------------------------------------
 SELECT setval('customers_id_seq', (SELECT MAX(id) FROM customers));
 SELECT setval('leads_id_seq', (SELECT MAX(id) FROM leads));
+SELECT setval('technicians_id_seq', (SELECT MAX(id) FROM technicians));
+SELECT setval('technician_assignments_id_seq', (SELECT MAX(id) FROM technician_assignments));

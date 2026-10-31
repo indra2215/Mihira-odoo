@@ -16,7 +16,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 # Import database models to verify state
-from apps.leads.models import Customer, Lead, InboundSubmission
+from apps.leads.models import Customer, Lead, InboundSubmission, Technician, TechnicianAssignment
 
 
 class LeadsAPITestCase(TestCase):
@@ -100,3 +100,63 @@ class LeadsAPITestCase(TestCase):
 
         # Assert response contains the 'stats' dictionary key
         self.assertIn("stats", response.data)
+
+
+    def test_technician_creation_and_listing(self):
+        """Verify field technicians can be registered and retrieved via the API."""
+        # Create a technician via API
+        payload = {
+            "name": "Karthik Raja",
+            "phone": "+919876543322",
+            "email": "karthik.raja@example.com",
+            "specialization": "site_surveyor",
+            "status": "available",
+        }
+        res = self.client.post("/api/v1/technicians/", payload, format="json")
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data["status"], "success")
+
+        # Verify technician is listed
+        list_res = self.client.get("/api/v1/technicians/")
+        self.assertEqual(list_res.status_code, 200)
+        self.assertGreaterEqual(len(list_res.data["data"]), 1)
+
+    def test_technician_assignment_with_kit_readiness(self):
+        """Verify task assignment can be created with kit readiness status and updated."""
+        # 1. Create customer and lead
+        customer = Customer.objects.create(name="Rohit Verma", phone="+919876511223")
+        lead = Lead.objects.create(customer=customer, source="manual_intake")
+
+        # 2. Create technician
+        tech = Technician.objects.create(
+            name="Sanjay Gupta",
+            phone="+919876599887",
+            specialization="solar_electrician",
+            status="available"
+        )
+
+        # 3. Create task assignment with kit inventory
+        assign_payload = {
+            "technician_id": tech.id,
+            "lead_id": lead.id,
+            "task_type": "inverter_installation",
+            "scheduled_date": "2026-11-05",
+            "kit_status": "kit_ready",
+            "kit_items": "5kW Hybrid Inverter, 6mm² DC Cable (40m), Battery Rack, Earth Mat",
+            "status": "assigned",
+            "notes": "Verify battery space in garage.",
+        }
+        res = self.client.post("/api/v1/technician-assignments/", assign_payload, format="json")
+        self.assertEqual(res.status_code, 201)
+        assignment_id = res.data["data"]["id"]
+        self.assertEqual(res.data["data"]["kit_status"], "kit_ready")
+
+        # 4. Update kit status via PATCH
+        patch_res = self.client.patch(
+            f"/api/v1/technician-assignments/{assignment_id}/",
+            {"kit_status": "dispatched", "status": "in_progress"},
+            format="json"
+        )
+        self.assertEqual(patch_res.status_code, 200)
+        self.assertEqual(patch_res.data["data"]["kit_status"], "dispatched")
+        self.assertEqual(patch_res.data["data"]["status"], "in_progress")

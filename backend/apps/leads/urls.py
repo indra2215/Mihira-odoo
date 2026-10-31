@@ -7,7 +7,14 @@ Maps API paths to corresponding views for lead creation, webhooks, and dashboard
 from django.urls import path
 
 # Import API class-based views
-from .views import LeadListCreateView, GoogleFormWebhookView, DashboardStatsView
+from .views import (
+    LeadListCreateView,
+    GoogleFormWebhookView,
+    DashboardStatsView,
+    TechnicianListCreateView,
+    TechnicianAssignmentListCreateView,
+    TechnicianAssignmentDetailView,
+)
 
 # Application URL patterns
 urlpatterns = [
@@ -22,4 +29,24 @@ urlpatterns = [
     # Route for retrieving dashboard counter statistics
     # URL: /api/v1/stats/
     path("stats/", DashboardStatsView.as_view(), name="dashboard-stats"),
+
+    # Route for listing and registering field technicians
+    # URL: /api/v1/technicians/
+    path("technicians/", TechnicianListCreateView.as_view(), name="technician-list-create"),
+
+    # Route for listing and creating technician task assignments with kit readiness
+    # URL: /api/v1/technician-assignments/
+    path(
+        "technician-assignments/",
+        TechnicianAssignmentListCreateView.as_view(),
+        name="technician-assignment-list-create",
+    ),
+
+    # Route for updating assignment status and kit readiness
+    # URL: /api/v1/technician-assignments/<id>/
+    path(
+        "technician-assignments/<int:pk>/",
+        TechnicianAssignmentDetailView.as_view(),
+        name="technician-assignment-detail",
+    ),
 ]

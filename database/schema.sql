@@ -156,3 +156,108 @@ CREATE INDEX IF NOT EXISTS idx_inbound_submissions_raw_payload ON inbound_submis
 
 -- Create index on received_at for audit trail chronological review
 CREATE INDEX IF NOT EXISTS idx_inbound_submissions_received_at ON inbound_submissions(received_at DESC);
+
+
+-- ------------------------------------------------------------------------------
+-- 5. TECHNICIANS TABLE (FIELD CREW & SOLAR ENGINEERS)
+-- Stores people working in the field conducting surveys and installations
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS technicians (
+    -- Auto-incrementing primary key ID
+    id SERIAL PRIMARY KEY,
+
+    -- Technician full name
+    name VARCHAR(255) NOT NULL,
+
+    -- Unique contact phone number
+    phone VARCHAR(32) NOT NULL UNIQUE,
+
+    -- Optional email address
+    email VARCHAR(255),
+
+    -- Primary technical role / specialization
+    specialization VARCHAR(64) NOT NULL DEFAULT 'solar_electrician'
+        CHECK (specialization IN ('solar_electrician', 'site_surveyor', 'mounting_specialist', 'commissioning_engineer')),
+
+    -- Availability status: 'available', 'on_site', or 'off_duty'
+    status VARCHAR(32) NOT NULL DEFAULT 'available'
+        CHECK (status IN ('available', 'on_site', 'off_duty')),
+
+    -- Creation timestamp
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- Last update timestamp (maintained by trigger)
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index on phone for fast lookup
+CREATE INDEX IF NOT EXISTS idx_technicians_phone ON technicians(phone);
+
+-- Index on status to quickly filter available staff
+CREATE INDEX IF NOT EXISTS idx_technicians_status ON technicians(status);
+
+-- Attach automated updated_at trigger to technicians table
+DROP TRIGGER IF EXISTS trigger_technicians_updated_at ON technicians;
+CREATE TRIGGER trigger_technicians_updated_at
+    BEFORE UPDATE ON technicians
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+
+-- ------------------------------------------------------------------------------
+-- 6. TECHNICIAN ASSIGNMENTS TABLE (TASKS & KIT READINESS)
+-- Tracks scheduled tasks assigned to technicians with associated toolkit readiness
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS technician_assignments (
+    -- Auto-incrementing primary key ID
+    id SERIAL PRIMARY KEY,
+
+    -- Foreign key to assigned technician (cascades on delete)
+    technician_id INTEGER NOT NULL REFERENCES technicians(id) ON DELETE CASCADE,
+
+    -- Foreign key to associated lead / solar project (cascades on delete)
+    lead_id INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+
+    -- Type of job assigned
+    task_type VARCHAR(64) NOT NULL DEFAULT 'site_survey'
+        CHECK (task_type IN ('site_survey', 'structure_mounting', 'panel_wiring', 'inverter_installation', 'grid_commissioning')),
+
+    -- Scheduled execution date
+    scheduled_date DATE NOT NULL,
+
+    -- Equipment and toolkit readiness stage: 'kit_ready', 'pending', or 'dispatched'
+    kit_status VARCHAR(32) NOT NULL DEFAULT 'pending'
+        CHECK (kit_status IN ('kit_ready', 'pending', 'dispatched')),
+
+    -- Detailed checklist of tools, safety gear, and materials prepared in the kit
+    kit_items TEXT NOT NULL DEFAULT '',
+
+    -- Execution lifecycle stage: 'assigned', 'in_progress', 'completed', 'cancelled'
+    status VARCHAR(32) NOT NULL DEFAULT 'assigned'
+        CHECK (status IN ('assigned', 'in_progress', 'completed', 'cancelled')),
+
+    -- Field notes, instructions, or customer roof access directions
+    notes TEXT DEFAULT '',
+
+    -- Creation timestamp
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- Last update timestamp (maintained by trigger)
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Composite index on technician and scheduled date for calendar lookups
+CREATE INDEX IF NOT EXISTS idx_tech_assign_technician_date ON technician_assignments(technician_id, scheduled_date);
+
+-- Index on lead_id to look up assignments for a specific project
+CREATE INDEX IF NOT EXISTS idx_tech_assign_lead ON technician_assignments(lead_id);
+
+-- Index on kit_status to filter jobs needing kit preparation
+CREATE INDEX IF NOT EXISTS idx_tech_assign_kit_status ON technician_assignments(kit_status);
+
+-- Attach automated updated_at trigger to assignments table
+DROP TRIGGER IF EXISTS trigger_tech_assign_updated_at ON technician_assignments;
+CREATE TRIGGER trigger_tech_assign_updated_at
+    BEFORE UPDATE ON technician_assignments
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

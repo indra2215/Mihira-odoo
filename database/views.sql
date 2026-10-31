@@ -88,3 +88,31 @@ LEFT JOIN leads l ON c.id = l.customer_id
 GROUP BY c.id, c.name, c.phone
 ORDER BY total_enquiries DESC;
 
+
+
+-- ------------------------------------------------------------------------------
+-- 5. TECHNICIAN TASK & KIT READINESS VIEW (v_technician_task_schedule)
+-- Shows all scheduled tasks, assigned field staff, project customer, and equipment kit status
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW v_technician_task_schedule AS
+SELECT
+    ta.id AS assignment_id,                             -- Primary assignment key
+    t.id AS technician_id,                              -- Technician key
+    t.name AS technician_name,                          -- Technician name
+    t.phone AS technician_phone,                        -- Contact phone
+    t.specialization AS technician_role,                -- Specialized technical field
+    l.id AS lead_id,                                    -- Associated lead enquiry
+    c.name AS customer_name,                            -- Customer name
+    c.phone AS customer_phone,                          -- Customer contact phone
+    c.address AS site_address,                          -- Rooftop address
+    ta.task_type,                                       -- Survey, Mounting, Wiring, or Commissioning
+    ta.scheduled_date,                                  -- Target execution date
+    ta.kit_status,                                      -- 'kit_ready', 'pending', or 'dispatched'
+    ta.kit_items,                                       -- Prepared tools and kit materials
+    ta.status AS task_status,                           -- 'assigned', 'in_progress', 'completed', 'cancelled'
+    ta.notes AS assignment_notes                        -- Access notes / instructions
+FROM technician_assignments ta
+JOIN technicians t ON ta.technician_id = t.id
+JOIN leads l ON ta.lead_id = l.id
+JOIN customers c ON l.customer_id = c.id
+ORDER BY ta.scheduled_date ASC;

@@ -21,10 +21,11 @@ interface NavItem {
 // Add new pages here to automatically appear in the sidebar
 // ─────────────────────────────────────────────────
 const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard",   href: "/",           icon: "📊" }, // Overview stats and recent leads
-  { label: "All Leads",   href: "/leads",      icon: "📋" }, // Full filterable leads table
-  { label: "New Lead",    href: "/leads/new",  icon: "✍️"  }, // Manual call intake form
-  { label: "Customers",   href: "/customers",  icon: "👥" }, // Deduplicated customer profiles
+  { label: "Dashboard",    href: "/",             icon: "📊" }, // Overview stats and recent leads
+  { label: "All Leads",    href: "/leads",        icon: "📋" }, // Full filterable leads table
+  { label: "New Lead",     href: "/leads/new",    icon: "✍️"  }, // Manual call intake form
+  { label: "Customers",    href: "/customers",    icon: "👥" }, // Deduplicated customer profiles
+  { label: "Technicians",  href: "/technicians",  icon: "👷" }, // Field workforce & kit readiness tasks
 ];
 
 // ─────────────────────────────────────────────────

@@ -13,14 +13,21 @@ __all__ = [
     "Customer",
     "Lead",
     "InboundSubmission",
+    "Technician",
+    "TechnicianAssignment",
     # DRF Serializers
     "CustomerSerializer",
     "LeadSerializer",
     "GoogleFormWebhookSerializer",
+    "TechnicianSerializer",
+    "TechnicianAssignmentSerializer",
     # DRF API Views
     "LeadListCreateView",
     "GoogleFormWebhookView",
     "DashboardStatsView",
+    "TechnicianListCreateView",
+    "TechnicianAssignmentListCreateView",
+    "TechnicianAssignmentDetailView",
     # Application Configuration
     "LeadsConfig",
 ]
@@ -33,17 +40,30 @@ def __getattr__(name: str):
     during early startup while still enabling clean package-level imports.
     """
     # Dynamic loader for database models
-    if name in ("Customer", "Lead", "InboundSubmission"):
+    if name in ("Customer", "Lead", "InboundSubmission", "Technician", "TechnicianAssignment"):
         from . import models
         return getattr(models, name)
 
     # Dynamic loader for DRF serializers
-    if name in ("CustomerSerializer", "LeadSerializer", "GoogleFormWebhookSerializer"):
+    if name in (
+        "CustomerSerializer",
+        "LeadSerializer",
+        "GoogleFormWebhookSerializer",
+        "TechnicianSerializer",
+        "TechnicianAssignmentSerializer",
+    ):
         from . import serializers
         return getattr(serializers, name)
 
     # Dynamic loader for API views
-    if name in ("LeadListCreateView", "GoogleFormWebhookView", "DashboardStatsView"):
+    if name in (
+        "LeadListCreateView",
+        "GoogleFormWebhookView",
+        "DashboardStatsView",
+        "TechnicianListCreateView",
+        "TechnicianAssignmentListCreateView",
+        "TechnicianAssignmentDetailView",
+    ):
         from . import views
         return getattr(views, name)
 
