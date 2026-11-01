@@ -1,14 +1,19 @@
 """
-Django Management Command to Seed Initial Demo Leads.
-Allows developers and testers to immediately populate the database with realistic data.
+Django Management Command: seed_leads
+Inserts realistic demo solar leads, customers, field technicians, and kit assignments
+into the database. Uses get_or_create so it is safe to run multiple times without
+creating duplicate records.
+
 Usage:
     python manage.py seed_leads
+    python manage.py seed_leads --reset   (clears first, then seeds)
 """
 
 import datetime
 
-# Import BaseCommand class for custom Django CLI commands
+# Import BaseCommand for custom Django CLI commands and call_command for chaining
 from django.core.management.base import BaseCommand
+from django.core.management import call_command
 
 # Import models to seed
 from apps.leads.models import Customer, Lead, InboundSubmission, Technician, TechnicianAssignment
@@ -16,10 +21,29 @@ from apps.leads.models import Customer, Lead, InboundSubmission, Technician, Tec
 
 class Command(BaseCommand):
     # Description displayed when running 'python manage.py help seed_leads'
-    help = "Seeds sample solar leads and customers into the database"
+    help = "Seeds sample solar leads, customers, technicians, and kit assignments into the database."
+
+    def add_arguments(self, parser):
+        """
+        Registers optional CLI arguments for seed_leads.
+        --reset: clears existing data before seeding (safe dev workflow).
+        """
+        parser.add_argument(
+            "--reset",
+            action="store_true",  # Boolean flag: present = True, absent = False
+            default=False,
+            help="Clear all existing data first before seeding. Equivalent to running reseed.",
+        )
 
     def handle(self, *args, **options):
         """Execution logic for the management command."""
+
+        # ── Optional Reset ────────────────────────────────────────────────────────
+        # If --reset was passed, wipe the database before seeding fresh data
+        if options["reset"]:
+            self.stdout.write(self.style.WARNING("[RESET] --reset flag detected. Clearing existing data first..."))
+            call_command("clear_leads", confirm=True, stdout=self.stdout, stderr=self.stderr)
+            self.stdout.write("")
 
         # ----------------------------------------------------------------------
         # Sample Record 1: Lead captured automatically from an online Google Form
@@ -165,4 +189,9 @@ class Command(BaseCommand):
             )
 
         # Write confirmation message to the terminal in green text
-        self.stdout.write(self.style.SUCCESS("Successfully seeded demo leads, customers, technicians, and kit assignments!"))
+        self.stdout.write(
+            self.style.SUCCESS(
+                "\n[OK] Seeded: 3 customers, 3 leads, 3 technicians, 2 kit assignments.\n"
+                "     Run 'python manage.py show_stats' to see full database summary."
+            )
+        )
