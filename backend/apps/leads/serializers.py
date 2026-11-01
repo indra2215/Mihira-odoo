@@ -6,8 +6,15 @@ Validates input data for staff call intake and incoming Google Forms webhooks.
 # Import Django REST Framework serializers
 from rest_framework import serializers
 
-# Import database models
-from .models import Customer, Lead, InboundSubmission, Technician, TechnicianAssignment
+# Import database models and validators
+from .models import (
+    Customer,
+    Lead,
+    InboundSubmission,
+    Technician,
+    TechnicianAssignment,
+    PHONE_REGEX_VALIDATOR,
+)
 
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -32,7 +39,12 @@ class LeadSerializer(serializers.ModelSerializer):
 
     # Write-only fields used when staff submits the manual intake form
     customer_name = serializers.CharField(write_only=True, required=True)
-    customer_phone = serializers.CharField(write_only=True, required=True)
+    customer_phone = serializers.CharField(
+        write_only=True,
+        required=True,
+        validators=[PHONE_REGEX_VALIDATOR],
+        help_text="Customer phone in E.164 format (+[1-9][0-9]{7,14})",
+    )
     customer_email = serializers.EmailField(write_only=True, required=False, allow_blank=True)
     customer_address = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
@@ -100,8 +112,12 @@ class GoogleFormWebhookSerializer(serializers.Serializer):
     # Customer name from Google Form (required)
     name = serializers.CharField(required=True)
 
-    # Customer phone number from Google Form (required)
-    phone = serializers.CharField(required=True)
+    # Customer phone number from Google Form (required, E.164 format)
+    phone = serializers.CharField(
+        required=True,
+        validators=[PHONE_REGEX_VALIDATOR],
+        help_text="Contact phone in E.164 format (+[1-9][0-9]{7,14})",
+    )
 
     # Optional email address
     email = serializers.EmailField(required=False, allow_blank=True, default="")
@@ -171,6 +187,11 @@ class GoogleFormWebhookSerializer(serializers.Serializer):
                         # Clean phone numbers of spaces, dashes, and parens
                         if target_field == "phone" and isinstance(val, str):
                             val = "".join(ch for ch in val if ch.isdigit() or ch == "+")
+                            # If respondent entered a 10-digit number without country code, prefix +91
+                            if not val.startswith("+") and len(val) == 10 and val[0] in "6789":
+                                val = f"+91{val}"
+                            elif not val.startswith("+") and len(val) == 11 and val.startswith("0") and val[1] in "6789":
+                                val = f"+91{val[1:]}"
                         normalized[target_field] = val
                     matched = True
                     break

@@ -35,6 +35,10 @@ CREATE TABLE IF NOT EXISTS customers (
     -- Unique phone number (used to prevent duplicate records)
     phone VARCHAR(32) NOT NULL UNIQUE,
 
+    -- Constraint enforcing E.164 international phone format (+ followed by 8 to 15 digits)
+    CONSTRAINT valid_customer_phone
+        CHECK (phone ~ '^\+[1-9][0-9]{7,14}$'),
+
     -- Optional email address
     email VARCHAR(255),
 
@@ -171,6 +175,10 @@ CREATE TABLE IF NOT EXISTS technicians (
 
     -- Unique contact phone number
     phone VARCHAR(32) NOT NULL UNIQUE,
+
+    -- Constraint enforcing E.164 international phone format (+ followed by 8 to 15 digits)
+    CONSTRAINT valid_technician_phone
+        CHECK (phone ~ '^\+[1-9][0-9]{7,14}$'),
 
     -- Optional email address
     email VARCHAR(255),

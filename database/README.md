@@ -53,7 +53,7 @@ In Docker Compose, the `./database` directory is mounted to `/docker-entrypoint-
 
 ## 4. Key Relational Constraints & Features
 
-* **Phone-based Deduplication:** `customers.phone` is declared `UNIQUE`. If a customer submits another Google Form or calls again, their enquiry is attached to their existing profile.
+* **Phone-based Deduplication & E.164 Format Validation:** `customers.phone` is declared `UNIQUE` and guarded by `CONSTRAINT valid_customer_phone CHECK (phone ~ '^\+[1-9][0-9]{7,14}$')`. If a customer submits another Google Form or calls again, their enquiry is attached to their existing profile. Technicians also enforce `CONSTRAINT valid_technician_phone CHECK (phone ~ '^\+[1-9][0-9]{7,14}$')`.
 * **Cascading Deletes:** `leads.customer_id REFERENCES customers(id) ON DELETE CASCADE`.
 * **Automated `updated_at`:** Managed via a PostgreSQL `BEFORE UPDATE` trigger (`update_updated_at_column`) on both `customers` and `leads`.
 * **JSONB Audit Log:** `inbound_submissions.raw_payload` is stored as binary JSON with a **GIN index**, allowing direct SQL indexing into arbitrary Google Form questions.

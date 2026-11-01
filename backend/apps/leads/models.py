@@ -7,6 +7,17 @@ and raw Inbound Webhook submissions.
 # Import Django database models module
 from django.db import models
 
+# Import RegexValidator to validate international phone format (E.164)
+from django.core.validators import RegexValidator
+
+# Reusable phone number validator enforcing E.164 international format:
+# Starts with '+', country code digit (1-9), followed by 7 to 14 digits
+# Examples: +919876543210 (India), +14155552671 (US), +447911123456 (UK)
+PHONE_REGEX_VALIDATOR = RegexValidator(
+    regex=r"^\+[1-9][0-9]{7,14}$",
+    message="Phone number must be in E.164 international format (e.g. +919876543210).",
+)
+
 
 class Customer(models.Model):
     """
@@ -17,7 +28,13 @@ class Customer(models.Model):
     name = models.CharField(max_length=255, help_text="Customer full name")
 
     # Phone number used as the primary unique key to prevent duplicate customer profiles
-    phone = models.CharField(max_length=32, unique=True, help_text="Unique phone number (e.g. +919876543210)")
+    # Enforces E.164 international format via validator
+    phone = models.CharField(
+        max_length=32,
+        unique=True,
+        validators=[PHONE_REGEX_VALIDATOR],
+        help_text="Unique phone number in E.164 format (e.g. +919876543210)",
+    )
 
     # Optional email address for quotation dispatch
     email = models.EmailField(blank=True, default="", help_text="Customer email address (optional)")
@@ -34,6 +51,13 @@ class Customer(models.Model):
     class Meta:
         db_table = "customers"         # Explicit PostgreSQL table name
         ordering = ["-created_at"]     # Newest customers first by default
+        constraints = [
+            # PostgreSQL database-level CHECK constraint enforcing E.164 phone regex
+            models.CheckConstraint(
+                condition=models.Q(phone__regex=r"^\+[1-9][0-9]{7,14}$"),
+                name="valid_customer_phone",
+            ),
+        ]
 
     def __str__(self):
         # String representation showing customer name and phone number
@@ -195,8 +219,13 @@ class Technician(models.Model):
     # Full name of technician
     name = models.CharField(max_length=255, help_text="Technician full name")
 
-    # Unique mobile contact number
-    phone = models.CharField(max_length=32, unique=True, help_text="Unique phone number")
+    # Unique mobile contact number in E.164 international format
+    phone = models.CharField(
+        max_length=32,
+        unique=True,
+        validators=[PHONE_REGEX_VALIDATOR],
+        help_text="Unique phone number in E.164 format (e.g. +919876543210)",
+    )
 
     # Optional email address
     email = models.EmailField(blank=True, default="", help_text="Technician email (optional)")
@@ -226,6 +255,13 @@ class Technician(models.Model):
     class Meta:
         db_table = "technicians"
         ordering = ["name"]
+        constraints = [
+            # PostgreSQL database-level CHECK constraint enforcing E.164 phone regex
+            models.CheckConstraint(
+                condition=models.Q(phone__regex=r"^\+[1-9][0-9]{7,14}$"),
+                name="valid_technician_phone",
+            ),
+        ]
 
     def __str__(self):
         # String representation showing name, role, and current availability

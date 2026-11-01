@@ -185,3 +185,36 @@ class LeadsAPITestCase(TestCase):
         lead = Lead.objects.get(customer=customer)
         self.assertEqual(float(lead.monthly_bill), 7500.50)
         self.assertIn("What type of roof do you have?", lead.notes)
+
+    def test_phone_e164_validation_rejection(self):
+        """Verify phone numbers that violate E.164 (+[1-9][0-9]{7,14}) are rejected with 400 Bad Request."""
+        invalid_phones = [
+            "9876543210",       # Missing leading '+'
+            "+0123456789",      # Country code cannot start with 0
+            "+91",              # Too short (less than 8 digits total)
+            "not-a-number",     # Letters
+            "+91 98765 43210",  # Unstripped internal spaces in direct manual API
+            "+123456789012345678", # Too long (> 15 digits)
+        ]
+
+        for bad_phone in invalid_phones:
+            payload = {
+                "customer_name": "Test User",
+                "customer_phone": bad_phone,
+            }
+            res = self.client.post("/api/v1/leads/", payload, format="json")
+            self.assertEqual(
+                res.status_code,
+                400,
+                f"Expected 400 Bad Request for invalid phone '{bad_phone}', got {res.status_code}",
+            )
+            self.assertIn("customer_phone", res.data["errors"])
+
+        # Also verify technician registration rejects invalid phone
+        bad_tech_res = self.client.post(
+            "/api/v1/technicians/",
+            {"name": "Bad Tech", "phone": "123456", "specialization": "solar_electrician"},
+            format="json",
+        )
+        self.assertEqual(bad_tech_res.status_code, 400)
+        self.assertIn("phone", bad_tech_res.data["errors"])
