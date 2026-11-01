@@ -21,11 +21,12 @@ interface NavItem {
 // Add new pages here to automatically appear in the sidebar
 // ─────────────────────────────────────────────────
 const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard",    href: "/",             icon: "📊" }, // Overview stats and recent leads
-  { label: "All Leads",    href: "/leads",        icon: "📋" }, // Full filterable leads table
-  { label: "New Lead",     href: "/leads/new",    icon: "✍️"  }, // Manual call intake form
-  { label: "Customers",    href: "/customers",    icon: "👥" }, // Deduplicated customer profiles
-  { label: "Technicians",  href: "/technicians",  icon: "👷" }, // Field workforce & kit readiness tasks
+  { label: "Dashboard",        href: "/",              icon: "📊" }, // Overview stats and recent leads
+  { label: "All Leads",        href: "/leads",         icon: "📋" }, // Full filterable leads table
+  { label: "New Lead",         href: "/leads/new",     icon: "✍️"  }, // Manual call intake form
+  { label: "Customers",        href: "/customers",     icon: "👥" }, // Deduplicated customer profiles
+  { label: "Technicians",      href: "/technicians",   icon: "👷" }, // Field workforce & kit readiness tasks
+  { label: "Google Form Setup",href: "/google-form",   icon: "📄" }, // Webhook bridge setup & Apps Script guide
 ];
 
 // ─────────────────────────────────────────────────
@@ -58,12 +59,23 @@ export default function Sidebar() {
       <nav className="flex-1 px-3 py-4 space-y-1">
         {/* Render each nav item from the NAV_ITEMS array */}
         {NAV_ITEMS.map((item) => {
-          // Determine if this link is the active page
-          // Exact match for "/" (dashboard), prefix match for deeper paths like "/leads"
+          // ── Active State Detection ──────────────────────────────────────
+          // Use EXACT match for all routes to prevent multiple items being
+          // highlighted simultaneously.
+          //
+          // Problem without exact match:
+          //   pathname = "/leads/new" → startsWith("/leads") = true  ← WRONG (both items lit)
+          //   pathname = "/leads/new" → startsWith("/leads/new") = true ← correct
+          //
+          // Special case: "/customers" and "/technicians" use prefix match so that
+          // future deep sub-routes (e.g. /customers/123) still highlight correctly,
+          // since those routes have no sibling conflicts in the nav.
           const isActive =
             item.href === "/"
-              ? pathname === "/"                          // Dashboard: exact match only
-              : pathname.startsWith(item.href);           // Other pages: prefix match
+              ? pathname === "/"                               // Dashboard: strict exact match
+              : item.href === "/leads"
+              ? pathname === "/leads"                          // All Leads: exact only (avoids /leads/new clash)
+              : pathname.startsWith(item.href);               // All others: prefix (safe since no siblings)
 
           return (
             <Link

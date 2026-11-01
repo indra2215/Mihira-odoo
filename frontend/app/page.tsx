@@ -321,7 +321,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Google Forms Webhook Info Card ── */}
-      {/* This is purely informational — tells the Django endpoint URL for Apps Script setup */}
+      {/* Links to the dedicated setup page with Apps Script guide */}
       <div className="mt-6 p-5 rounded-2xl bg-slate-800 text-slate-100 flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex-1">
           <p className="text-sm font-bold">Google Forms Webhook Endpoint</p>
@@ -333,11 +333,20 @@ export default function DashboardPage() {
             POST {API}/webhooks/google-form/
           </code>
         </div>
-        {/* Status pill */}
-        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 whitespace-nowrap">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          Endpoint Active
-        </span>
+        <div className="flex flex-col gap-2 shrink-0">
+          {/* Status pill */}
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Endpoint Active
+          </span>
+          {/* Link to full setup guide */}
+          <Link
+            href="/google-form"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition whitespace-nowrap"
+          >
+            📋 Setup Guide →
+          </Link>
+        </div>
       </div>
     </div>
   );
